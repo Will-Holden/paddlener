@@ -7,15 +7,17 @@ import requests
 from consul import Consul
 import requests
 from settings import CONSUL_HOST, CONSUL_PORT
-from consulclient.ConsulClient import ConsulClient
 from functools import lru_cache
 import socket
+from random import randint
+
 
 
 @lru_cache()
 def get_service(name):
     consul = ConsulClient(host=CONSUL_HOST, port=CONSUL_PORT)
     service_url, service_port = consul.getService(name)
+    return service_url, service_port
 
 def get_ip():
     hostname = socket.gethostbyname()
@@ -40,9 +42,13 @@ class Client:
         url, port = get_service(self.name)
         base_url = "http://{0}:{1}/{2}".format(url, port, func)
         response = requests.post(base_url, data={'content': data})
-        if response.status_code != 200:
+        if response.status_code == 404:
             raise Exception("func no exists or can not connect to url")
-        result = result.json()
+        elif response.status_code == 500:
+            raise Exception("server 500 error")
+        elif not response.status_code == 200:
+            raise Exception("server error code {0}".format(resposne.status_code))
+        result = response.json()
         return result
 
 class Server:
@@ -50,13 +56,14 @@ class Server:
     def __init__(self, name):
         self.name = name
 
-    def __call__(self, address, port, tags, inerval):
+    def __call__(self, address, port, tags, interval):
         # address = get_ip()
-        service_id = "{0}_{1}_{2}".format(self.name, address, port)
+        name = self.name
+        service_id = "{0}_{1}_{2}".format(self.name, address.replace('.', '_'), port)
         httpcheck = "http://{0}:{1}/status".format(address, port)
         consul = ConsulClient(host=CONSUL_HOST, port=CONSUL_PORT)
         response = consul.register(name, service_id, address, port, tags, interval, httpcheck)
-        if response.status_code != 200:
+        if not response:
             raise Exception("conusl server my failed")
         return True
 
@@ -71,15 +78,15 @@ class ConsulClient:
         self.consul = Consul(host=host, port=port)
 
     def register(self, name, service_id, address, port, tags, interval, httpcheck):
-        self.consul.agent.service.register(
-            name, service_id=service_id, address=address, port=port, tags=tags, interval=interval, httpcheck=httpcheck)
+        return self.consul.agent.service.register(
+            name, service_id=service_id, address=address, port=port, tags=tags, interval=interval, http=httpcheck)
 
     def deregister(self, service_id):
         self.consul.agent.service.deregister(service_id)
         self.consul.check.deregister(service_id)
 
     def getService(self, name):
-        url = "http://" + self.host + ";" + \
+        url = "http://" + self.host + ":" + \
             str(self.port) + "/v1/catalog/service/" + name
         dataCenterResp = requests.get(url)
         if dataCenterResp.status_code != 200:
@@ -91,10 +98,10 @@ class ConsulClient:
         serviceList = []  # 服务列表 初始化
         for dc in dcset:
             if self.token:
-                url = 'http://' + self.host + ':' + self.port + \
+                url = 'http://' + self.host + ':' + str(self.port) + \
                     '/v1/health/service/' + name + '?dc=' + dc + '&token=' + self.token
             else:
-                url = 'http://' + self.host + ':' + self.port + \
+                url = 'http://' + self.host + ':' + str(self.port) + \
                     '/v1/health/service/' + name + '?dc=' + dc + '&token='
             resp = requests.get(url)
             if resp.status_code != 200:

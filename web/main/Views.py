@@ -3,6 +3,8 @@ from flask import Flask, request, jsonify
 import json
 from werkzeug.utils import secure_filename
 from settings import BASE_DIR
+from core.ernie import ner
+from core.ernie_huodong import huodong_ner
 import datetime
 import re
 import os
@@ -19,7 +21,28 @@ import os
 #             result = {'result': 'false'}
 #         return json.dumps(result, ensure_ascii=False)
 
-@inf_restful.route("/info", methods=["GET"])
+@inf_restful.route('/huodong_ner', methods=['POST'])
+def huodong_ner_func():
+    if request.method == 'POST':
+        data = request.form['content']
+        tags = huodong_ner(data)
+        result = {
+            'result': tags
+        }
+        return json.dumps(result, ensure_ascii=False)
+
+
+@inf_restful.route("/ner", methods=['POST'])
+def ner_func():
+    if request.method == 'POST':
+        data = request.form['content']
+        tags = ner(data)
+        result = {
+            'result': tags
+        }
+        return json.dumps(result, ensure_ascii=False)
+
+@inf_restful.route("/status", methods=["GET"])
 def info():
     result = {'name': 'server',
               'state': 'running'}

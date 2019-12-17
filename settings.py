@@ -7,6 +7,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 HOST= "0.0.0.0"
-PORT= 18084
-CONSUL_HOST="rembern.com"
-CONSUL_PORT=8500
+PORT= 18087
+CONSUL_HOST="newbee13"
+CONSUL_PORT=30785
+SERVER_HOST="172.16.10.12"
+SERVER_PORT=18087
